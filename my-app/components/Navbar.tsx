@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { Camera, Search, User, Menu, X } from "lucide-react";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isDashboard = pathname.startsWith("/dashboard");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -55,18 +58,34 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="hidden md:flex items-center gap-4">
-          <Link 
-            href="/login" 
-            className="text-sm font-medium px-4 py-2 hover:bg-muted rounded-lg transition-colors"
-          >
-            Login
-          </Link>
-          <Link 
-            href="/join-as-photographer" 
-            className="text-sm font-medium px-5 py-2.5 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity shadow-lg shadow-primary/20"
-          >
-            Become a Photographer
-          </Link>
+          {isDashboard ? (
+            <div className="flex items-center gap-4">
+              <Link 
+                href="/" 
+                className="text-sm font-semibold italic border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition-all"
+              >
+                Sign Out
+              </Link>
+              <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center border border-primary/30">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+            </div>
+          ) : (
+            <>
+              <Link 
+                href="/login" 
+                className="text-sm font-semibold italic border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition-all active:scale-95"
+              >
+                Sign In
+              </Link>
+              <Link 
+                href="/signup" 
+                className="text-sm font-black italic px-7 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20 tracking-widest uppercase active:scale-95"
+              >
+                Join Lumina
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Menu Toggle */}
@@ -84,13 +103,13 @@ export function Navbar() {
           <Link href="/explore" className="text-lg font-medium">Explore</Link>
           <Link href="/how-it-works" className="text-lg font-medium">How it works</Link>
           <Link href="/pricing" className="text-lg font-medium">Pricing</Link>
-          <hr className="border-border" />
-          <Link href="/login" className="text-lg font-medium">Login</Link>
+          <hr className="border-border/50" />
+          <Link href="/login" className="text-xl font-black italic tracking-tight">Sign In</Link>
           <Link 
-            href="/join-as-photographer" 
-            className="text-lg font-medium px-6 py-3 bg-primary text-primary-foreground rounded-xl text-center"
+            href="/signup" 
+            className="text-xl font-black italic px-6 py-4 bg-primary text-primary-foreground rounded-2xl text-center shadow-xl shadow-primary/10 tracking-widest uppercase"
           >
-            Become a Photographer
+            Join Lumina
           </Link>
         </div>
       )}
