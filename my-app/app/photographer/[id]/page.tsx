@@ -125,7 +125,7 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest border border-primary/20">Elite Storyteller</div>
               <h1 className="text-5xl font-black italic tracking-tighter font-serif leading-none">{photographer.full_name}</h1>
               <div className="flex items-center gap-4 text-muted-foreground font-semibold italic">
-                <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-primary" /> Global Boutique</span>
+                <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-primary" /> {photographer.location || "Global Boutique"}</span>
                 <span className="flex items-center gap-1"><Star className="w-4 h-4 text-primary fill-current" /> 5.0 (42 Review)</span>
               </div>
             </div>
@@ -134,7 +134,7 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
           <div className="flex items-center gap-4">
              <div className="text-right mr-4">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase">Base Investment</p>
-                <h3 className="text-3xl font-black italic text-primary leading-none">$250</h3>
+                <h3 className="text-3xl font-black italic text-primary leading-none">{photographer.rate || "$250"}</h3>
              </div>
              <Button 
                onClick={() => setShowBookingModal(true)}
@@ -204,7 +204,7 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
                  <div className="space-y-1">
                     <h4 className="font-serif font-black italic text-xl">Artist Bio</h4>
                     <p className="text-sm text-muted-foreground italic font-medium leading-relaxed italic">
-                      "Capturing the raw beauty of human connection through natural light and cinematic composition."
+                      "{photographer.bio || "Capturing the raw beauty of human connection through natural light and cinematic composition."}"
                     </p>
                  </div>
               </div>
@@ -221,7 +221,7 @@ export default function PhotographerProfilePage({ params }: { params: Promise<{ 
               <div className="space-y-3">
                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Specialties</p>
                  <div className="flex flex-wrap gap-2">
-                   {["Weddings", "Portraits", "Cinematic", "Editorial"].map(tag => (
+                   {(photographer.specialty ? photographer.specialty.split(',').map((s: string) => s.trim()) : ["Weddings", "Portraits", "Cinematic", "Editorial"]).map((tag: string) => (
                      <span key={tag} className="px-4 py-1.5 rounded-xl bg-muted/50 border border-border text-[9px] font-black italic tracking-widest uppercase">{tag}</span>
                    ))}
                  </div>

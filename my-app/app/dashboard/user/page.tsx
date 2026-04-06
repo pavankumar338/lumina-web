@@ -110,8 +110,45 @@ export default function UserDashboard() {
     router.push("/login");
   };
 
+  const toggleFavorite = async (photographerId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+
+    const favoriteEntry = favorites.find(f => f.photographer_id === photographerId);
+
+    if (favoriteEntry) {
+      // Remove from favorites
+      const { error } = await supabase
+        .from('favorites')
+        .delete()
+        .eq('id', favoriteEntry.id);
+      
+      if (!error) {
+        setFavorites(favorites.filter(f => f.id !== favoriteEntry.id));
+      }
+    } else {
+      // Add to favorites
+      const { data, error } = await supabase
+        .from('favorites')
+        .insert({
+          client_id: user.id,
+          photographer_id: photographerId
+        })
+        .select('*, photographer:profiles!photographer_id(*)')
+        .single();
+      
+      if (!error && data) {
+        setFavorites([...favorites, data]);
+      }
+    }
+  };
+
   const filteredPhotographers = photographers.filter(p =>
     p.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -201,12 +238,19 @@ export default function UserDashboard() {
                         <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-md px-3 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm text-xs font-black italic">
                           <Star className="w-3 h-3 text-primary fill-current" /> 5.0
                         </div>
+                        {p.avatar_url && (
+                          <div className="absolute bottom-3 left-3 w-12 h-12 rounded-full border-2 border-background shadow-lg overflow-hidden">
+                            <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
+                          </div>
+                        )}
                       </div>
                       <CardContent className="p-5 space-y-3">
-                        <div>
-                          <h4 className="text-lg font-black italic tracking-tight">{p.full_name}</h4>
-                          <p className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground italic">Professional Storyteller</p>
-                        </div>
+                          <div className={cn(p.avatar_url ? "pl-2" : "")}>
+                            <h4 className="text-lg font-black italic tracking-tight">{p.full_name}</h4>
+                            <p className="text-[10px] uppercase font-black tracking-[0.2em] text-muted-foreground italic flex items-center gap-1">
+                              {p.location || 'Global Artist'} • Professional Storyteller
+                            </p>
+                          </div>
                         <div className="flex gap-2">
                           <Button
                             className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-black italic text-xs h-10 shadow-lg shadow-primary/20"
@@ -214,7 +258,16 @@ export default function UserDashboard() {
                           >
                             Book Session
                           </Button>
-                          <Button variant="outline" className="w-10 h-10 p-0 border-2"><Heart className="w-4 h-4" /></Button>
+                          <Button 
+                            variant="outline" 
+                            className={cn(
+                              "w-10 h-10 p-0 border-2 transition-colors",
+                              favorites.some(f => f.photographer_id === p.id) ? "border-rose-500 text-rose-500 bg-rose-500/5" : "border-border"
+                            )}
+                            onClick={() => toggleFavorite(p.id)}
+                          >
+                            <Heart className={cn("w-4 h-4", favorites.some(f => f.photographer_id === p.id) && "fill-current")} />
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -258,12 +311,19 @@ export default function UserDashboard() {
                       </div>
                       <CardContent className="p-5 space-y-4">
                         <div className="flex justify-between items-start">
-                          <div className="cursor-pointer" onClick={() => router.push(`/photographer/${p.id}`)}>
-                            <h4 className="text-xl font-black italic tracking-tight group-hover:text-primary transition-colors">{p.full_name}</h4>
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <div className="flex items-center gap-1 text-primary"><Star className="w-3 h-3 fill-current" /><span className="text-xs font-black italic">5.0</span></div>
-                              <div className="w-1 h-1 rounded-full bg-border" />
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Wedding • Portrait</span>
+                          <div className="cursor-pointer flex items-center gap-3" onClick={() => router.push(`/photographer/${p.id}`)}>
+                            {p.avatar_url && (
+                              <div className="w-10 h-10 rounded-full overflow-hidden border border-border shrink-0">
+                                <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
+                              </div>
+                            )}
+                            <div>
+                              <h4 className="text-xl font-black italic tracking-tight group-hover:text-primary transition-colors">{p.full_name}</h4>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <div className="flex items-center gap-1 text-primary"><Star className="w-3 h-3 fill-current" /><span className="text-xs font-black italic">5.0</span></div>
+                                <div className="w-1 h-1 rounded-full bg-border" />
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{p.location || 'Global'} • {p.specialty || 'Wedding • Portrait'}</span>
+                              </div>
                             </div>
                           </div>
                           <div className="text-right">
@@ -273,13 +333,89 @@ export default function UserDashboard() {
                         </div>
                         <div className="pt-2 border-t border-border/50 flex gap-3">
                           <Button className="flex-1 rounded-xl font-bold bg-primary italic text-xs" onClick={() => router.push(`/photographer/${p.id}`)}>Book Discovery</Button>
-                          <Button variant="ghost" className="w-10 h-10 p-0 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"><Heart className="w-5 h-5" /></Button>
+                          <Button 
+                            variant="ghost" 
+                            className={cn(
+                              "w-10 h-10 p-0 transition-colors",
+                              favorites.some(f => f.photographer_id === p.id) ? "text-rose-500 bg-rose-500/10" : "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                            )}
+                            onClick={() => toggleFavorite(p.id)}
+                          >
+                            <Heart className={cn("w-5 h-5", favorites.some(f => f.photographer_id === p.id) && "fill-current")} />
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
                   </motion.div>
                 ))}
               </div>
+            </motion.div>
+          )}
+
+          {/* ===================== FAVORITES TAB ===================== */}
+          {activeTab === "favorites" && (
+            <motion.div key="favorites" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
+              <div className="space-y-1">
+                <h2 className="text-4xl font-black italic font-serif">Saved Storytellers</h2>
+                <p className="text-muted-foreground">The creative minds you've connected with.</p>
+              </div>
+
+              {favorites.length === 0 ? (
+                <Card className="border-none shadow-xl ring-1 ring-border p-20 text-center space-y-4 bg-muted/20">
+                  <Heart className="w-16 h-16 text-muted-foreground mx-auto opacity-30" />
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-serif font-black italic">No favorites yet</h3>
+                    <p className="text-muted-foreground max-w-xs mx-auto">Explore our elite community and save the photographers that inspire you.</p>
+                  </div>
+                  <Button onClick={() => setActiveTab("discover")} className="px-10 py-6 text-lg font-black italic bg-primary shadow-xl shadow-primary/20">Discover Pros</Button>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {favorites.map((fav) => {
+                    const p = fav.photographer;
+                    return (
+                      <Card key={fav.id} className="group overflow-hidden border-border hover:border-primary/50 transition-all duration-500 bg-background/80 backdrop-blur-xl">
+                        <div className="aspect-[4/5] bg-muted relative overflow-hidden cursor-pointer" onClick={() => router.push(`/photographer/${p.id}`)}>
+                           {p.portfolios?.[0] ? (
+                            <img src={p.portfolios[0].image_url} alt="Work" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground"><ImageIcon className="w-16 h-16 opacity-20" /></div>
+                          )}
+                          <div className="absolute top-3 right-3 bg-background/80 backdrop-blur-md px-3 py-1 rounded-full border border-border flex items-center gap-1.5 shadow-sm text-xs font-black italic">
+                            <Star className="w-3 h-3 text-primary fill-current" /> 5.0
+                          </div>
+                          {p.avatar_url && (
+                             <div className="absolute bottom-3 left-3 w-12 h-12 rounded-full border-2 border-background shadow-lg overflow-hidden">
+                               <img src={p.avatar_url} alt={p.full_name} className="w-full h-full object-cover" />
+                             </div>
+                           )}
+                        </div>
+                        <CardContent className="p-5 space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div className="cursor-pointer" onClick={() => router.push(`/photographer/${p.id}`)}>
+                              <h4 className="text-xl font-black italic tracking-tight group-hover:text-primary transition-colors">{p.full_name}</h4>
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Wedding • Portrait</p>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              className="text-rose-500 hover:bg-rose-500/10 text-xs font-bold italic"
+                              onClick={() => toggleFavorite(p.id)}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                          <Button 
+                            className="w-full rounded-xl font-bold bg-primary italic text-xs h-12" 
+                            onClick={() => router.push(`/photographer/${p.id}`)}
+                          >
+                            Book Session
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </motion.div>
           )}
 

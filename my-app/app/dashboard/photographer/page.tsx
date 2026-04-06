@@ -162,6 +162,54 @@ export default function PhotographerDashboard() {
     }
   };
 
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `avatars/${user.id}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // 1. Upload to Supabase Storage - Use portfolio-images bucket
+      // Check if bucket exists or just try to upload
+      const { error: uploadError } = await supabase.storage
+        .from('portfolio-images')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('portfolio-images')
+        .getPublicUrl(filePath);
+
+      // 3. Update profile record
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({
+          avatar_url: publicUrl
+        })
+        .eq('id', user.id);
+
+      if (dbError) throw dbError;
+
+      // 4. Update UI
+      setProfile({ ...profile, avatar_url: publicUrl });
+      alert("Profile picture updated successfully!");
+
+    } catch (error: any) {
+      alert("Error uploading avatar: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleDeletePhoto = async (photoId: string, imageUrl: string) => {
     try {
       // 1. Delete DB entry
@@ -196,6 +244,32 @@ export default function PhotographerDashboard() {
     }
   };
 
+  const handleUpdateProfile = async () => {
+    try {
+      setIsUploading(true); // Reusing isUploading for profile progress
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.full_name,
+          specialty: profile.specialty,
+          location: profile.location,
+          rate: profile.rate,
+          bio: profile.bio
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+      alert("Profile updated successfully!");
+    } catch (error: any) {
+      alert("Error updating profile: " + error.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -208,9 +282,16 @@ export default function PhotographerDashboard() {
     <div className="min-h-screen bg-muted/30 pt-20 flex">
       {/* Dynamic Sidebar */}
       <aside className="w-64 bg-background border-r border-border hidden lg:flex flex-col sticky top-20 h-[calc(100vh-5rem)]">
-        <div className="p-6 border-b border-border/50">
-          <h2 className="font-serif font-black text-xl italic tracking-tight">{profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Studio</h2>
-          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">Management Console</p>
+        <div className="p-6 border-b border-border/50 flex flex-col gap-4">
+          {profile?.avatar_url && (
+            <div className="w-12 h-12 rounded-xl overflow-hidden border border-border shadow-sm">
+              <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div>
+            <h2 className="font-serif font-black text-xl italic tracking-tight">{profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Studio</h2>
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">Management Console</p>
+          </div>
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -239,9 +320,11 @@ export default function PhotographerDashboard() {
                 <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold italic tracking-wider uppercase mb-1.5 border border-primary/20 backdrop-blur-sm">
                   <Star className="w-3.5 h-3.5 fill-current" /> Premium Photographer
                 </motion.div>
-                <h1 className="text-4xl md:text-5xl font-extrabold font-serif tracking-tight text-foreground">
-                  {profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Hub <span className="text-primary italic opacity-90 inline-block rotate-[-2deg] transition-transform group-hover:rotate-0 duration-500">.</span>
-                </h1>
+                <div className="flex items-center gap-6 mb-2">
+                  <h1 className="text-4xl md:text-5xl font-extrabold font-serif tracking-tight text-foreground">
+                    {profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Hub <span className="text-primary italic opacity-90 inline-block rotate-[-2deg] transition-transform group-hover:rotate-0 duration-500">.</span>
+                  </h1>
+                </div>
                 <p className="text-muted-foreground max-w-md">Welcome back, {profile?.full_name}. Here is your vision command center.</p>
               </div>
               <div className="flex gap-4 w-full md:w-auto">
@@ -413,8 +496,12 @@ export default function PhotographerDashboard() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
             <div className="flex justify-between items-end">
               <h2 className="text-3xl font-extrabold font-serif italic">Portfolio Management</h2>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-xl shadow-primary/20 gap-2">
-                 <Upload className="w-4 h-4" /> Save Changes
+              <Button 
+                onClick={handleUpdateProfile} 
+                disabled={isUploading}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-xl shadow-primary/20 gap-2"
+              >
+                 {isUploading ? "Saving..." : "Save Changes"}
               </Button>
             </div>
 
@@ -425,22 +512,64 @@ export default function PhotographerDashboard() {
                   <CardHeader>
                     <CardTitle className="italic font-serif">Public Profile</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-6">
+                    <div className="flex flex-col items-center gap-4 mb-4">
+                      <div className="relative group">
+                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary/20 shadow-xl bg-muted">
+                          {profile?.avatar_url ? (
+                            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-muted-foreground/10">
+                              <User className="w-12 h-12" />
+                            </div>
+                          )}
+                        </div>
+                        <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer">
+                          <Upload className="text-white w-6 h-6" />
+                          <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                        </label>
+                      </div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Click to update portrait</p>
+                    </div>
                     <div className="space-y-2">
                       <Label>Display Name</Label>
-                      <Input defaultValue={profile?.full_name} />
+                      <Input 
+                        value={profile?.full_name || ""} 
+                        onChange={(e) => setProfile({...profile, full_name: e.target.value})} 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Specialty (e.g. Wedding, Portrait)</Label>
-                      <Input defaultValue="Wedding & Commercial" />
+                      <Input 
+                        value={profile?.specialty || ""} 
+                        onChange={(e) => setProfile({...profile, specialty: e.target.value})} 
+                        placeholder="Wedding & Commercial" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Operational Location (City, State)</Label>
+                      <Input 
+                        value={profile?.location || ""} 
+                        onChange={(e) => setProfile({...profile, location: e.target.value})} 
+                        placeholder="Los Angeles, CA" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Hourly Rate / Minimum</Label>
-                      <Input defaultValue="$250 / session" />
+                      <Input 
+                        value={profile?.rate || ""} 
+                        onChange={(e) => setProfile({...profile, rate: e.target.value})} 
+                        placeholder="$250 / session" 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Bio</Label>
-                      <textarea className="w-full h-32 rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" defaultValue="Capturing raw moments and natural lighting." />
+                      <textarea 
+                        className="w-full h-32 rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
+                        value={profile?.bio || ""} 
+                        onChange={(e) => setProfile({...profile, bio: e.target.value})} 
+                        placeholder="Capturing raw moments and natural lighting." 
+                      />
                     </div>
                   </CardContent>
                 </Card>
