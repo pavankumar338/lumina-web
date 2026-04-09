@@ -73,7 +73,7 @@ export default function LoginPage() {
             <div>
               <CardTitle className="text-3xl font-serif">Welcome Back</CardTitle>
               <CardDescription className="text-base mt-2">
-                Continue your journey with Lumina
+                Continue your journey with Menorify
               </CardDescription>
             </div>
           </CardHeader>

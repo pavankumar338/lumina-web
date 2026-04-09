@@ -17,7 +17,7 @@ export function Footer() {
                 <Camera className="w-6 h-6 text-primary-foreground" />
               </div>
               <span className="text-2xl font-bold tracking-tight text-white">
-                Lumina
+                Menorify
               </span>
             </Link>
             <p className="text-lg leading-relaxed max-w-sm mb-10">
@@ -64,14 +64,14 @@ export function Footer() {
                 <Mail className="mt-1 w-5 h-5 text-primary" />
                 <div>
                   <div className="text-white font-bold mb-1">Email us at:</div>
-                  <a href="mailto:concierge@lumina.com" className="hover:text-primary transition-colors">concierge@lumina.com</a>
+                  <a href="mailto:concierge@menorify.com" className="hover:text-primary transition-colors">concierge@menorify.com</a>
                 </div>
               </li>
               <li className="flex items-start gap-4">
                 <Phone className="mt-1 w-5 h-5 text-primary" />
                 <div>
                   <div className="text-white font-bold mb-1">Speak with us:</div>
-                  <a href="tel:+1800LUMINA" className="hover:text-primary transition-colors">+1-800-LUMINA-CONCIERGE</a>
+                  <a href="tel:+1800MENORIFY" className="hover:text-primary transition-colors">+1-800-MENORIFY-CONCIERGE</a>
                 </div>
               </li>
               <li className="flex items-start gap-4">
@@ -87,7 +87,7 @@ export function Footer() {
 
         <div className="pt-12 border-t border-zinc-900 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-sm tracking-wide">
-            &copy; {currentYear} Lumina International Ltd. All rights reserved. 
+            &copy; {currentYear} Menorify International Ltd. All rights reserved. 
             Crafted with passion for world-class artists.
           </p>
           <div className="flex gap-8 text-xs font-bold uppercase tracking-[0.2em]">

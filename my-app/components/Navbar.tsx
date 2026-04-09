@@ -36,7 +36,7 @@ export function Navbar() {
             <Camera className="w-6 h-6 text-primary-foreground" />
           </div>
           <span className="text-2xl font-bold tracking-tight text-foreground">
-            Lumina
+            Menorify
           </span>
         </Link>
 
@@ -82,7 +82,7 @@ export function Navbar() {
                 href="/signup" 
                 className="text-sm font-black italic px-7 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20 tracking-widest uppercase active:scale-95"
               >
-                Join Lumina
+                Join Menorify
               </Link>
             </>
           )}
@@ -109,7 +109,7 @@ export function Navbar() {
             href="/signup" 
             className="text-xl font-black italic px-6 py-4 bg-primary text-primary-foreground rounded-2xl text-center shadow-xl shadow-primary/10 tracking-widest uppercase"
           >
-            Join Lumina
+            Join Menorify
           </Link>
         </div>
       )}

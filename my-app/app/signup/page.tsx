@@ -94,7 +94,7 @@ export default function SignupPage() {
               <Camera className="w-8 h-8 text-primary" />
             </div>
             <div>
-              <CardTitle className="text-3xl font-serif">Join Lumina</CardTitle>
+              <CardTitle className="text-3xl font-serif">Join Menorify</CardTitle>
               <CardDescription className="text-base mt-2">
                 Join our premium community of visual storytellers
               </CardDescription>

@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { 
-  Camera, 
+import {
+  Camera,
   Image as ImageIcon,
   MessageSquare,
   MoreVertical,
@@ -11,11 +11,16 @@ import {
   LayoutDashboard,
   Calendar,
   LogOut,
+  Plus,
+  Phone,
+  Mail,
   Upload,
   User,
-  Plus
+  CheckCircle,
+  XCircle,
+  X
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/Card";
 import { Button } from "@/components/Button";
 import { Input } from "@/components/ui/Input";
@@ -50,16 +55,23 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge }: any) {
 export default function PhotographerDashboard() {
   const supabase = createClient();
   const router = useRouter();
-  
+
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const [bookings, setBookings] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
   const [portfolio, setPortfolio] = useState<any[]>([]);
-  
+
   const [activeTab, setActiveTab] = useState("overview");
   const [isUploading, setIsUploading] = useState(false);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   useEffect(() => {
     async function getProfile() {
@@ -69,15 +81,6 @@ export default function PhotographerDashboard() {
         return;
       }
 
-      // Pre-set profile from auth metadata for immediate display
-      const metadata = user.user_metadata;
-      setProfile({
-        full_name: metadata?.full_name || user.email?.split('@')[0],
-        role: metadata?.role || 'PHOTOGRAPHER',
-        email: user.email
-      });
-
-      // Try to fetch official profile from the database
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -86,17 +89,21 @@ export default function PhotographerDashboard() {
 
       if (profileData) {
         setProfile(profileData);
+      } else {
+        const metadata = user.user_metadata;
+        setProfile({
+          full_name: metadata?.full_name || user.email?.split('@')[0],
+          role: metadata?.role || 'PHOTOGRAPHER',
+          email: user.email
+        });
       }
 
-      // Fetch Realtime Photographer Data
-      const [bookingsRes, msgRes, portfolioRes] = await Promise.all([
-        supabase.from('bookings').select('*').eq('photographer_id', user.id),
-        supabase.from('messages').select('*').eq('receiver_id', user.id),
+      const [bookingsRes, portfolioRes] = await Promise.all([
+        supabase.from('bookings').select('*, client:profiles!client_id(*)').eq('photographer_id', user.id),
         supabase.from('portfolios').select('*').eq('photographer_id', user.id).order('created_at', { ascending: false })
       ]);
 
       if (bookingsRes.data) setBookings(bookingsRes.data);
-      if (msgRes.data) setMessages(msgRes.data);
       if (portfolioRes.data) setPortfolio(portfolioRes.data);
 
       setLoading(false);
@@ -123,19 +130,16 @@ export default function PhotographerDashboard() {
       const fileName = `${user.id}/${Math.random()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // 1. Upload to Supabase Storage
-      const { error: uploadError, data } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('portfolio-images')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('portfolio-images')
         .getPublicUrl(filePath);
 
-      // 3. Save Record to Portfolios table
       const { error: dbError } = await supabase
         .from('portfolios')
         .insert({
@@ -146,17 +150,17 @@ export default function PhotographerDashboard() {
 
       if (dbError) throw dbError;
 
-      // 4. Refresh Portfolio
       const { data: refreshedPortfolio } = await supabase
         .from('portfolios')
         .select('*')
         .eq('photographer_id', user.id)
         .order('created_at', { ascending: false });
-      
+
       if (refreshedPortfolio) setPortfolio(refreshedPortfolio);
+      setNotification({ message: "Masterpiece Uploaded: Your collection is updated.", type: 'success' });
 
     } catch (error: any) {
-      alert("Error uploading image: " + error.message);
+      setNotification({ message: "Signal Loss: Upload failed - " + error.message, type: 'error' });
     } finally {
       setIsUploading(false);
     }
@@ -176,54 +180,46 @@ export default function PhotographerDashboard() {
       const fileName = `avatars/${user.id}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // 1. Upload to Supabase Storage - Use portfolio-images bucket
-      // Check if bucket exists or just try to upload
       const { error: uploadError } = await supabase.storage
         .from('portfolio-images')
         .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // 2. Get Public URL
       const { data: { publicUrl } } = supabase.storage
         .from('portfolio-images')
         .getPublicUrl(filePath);
 
-      // 3. Update profile record
       const { error: dbError } = await supabase
         .from('profiles')
-        .update({
-          avatar_url: publicUrl
-        })
+        .update({ avatar_url: publicUrl })
         .eq('id', user.id);
 
       if (dbError) throw dbError;
 
-      // 4. Update UI
       setProfile({ ...profile, avatar_url: publicUrl });
-      alert("Profile picture updated successfully!");
+      setNotification({ message: "Identity Refined: Profile portrait updated.", type: 'success' });
 
     } catch (error: any) {
-      alert("Error uploading avatar: " + error.message);
+      setNotification({ message: "Acquisition Error: Portrait failed - " + error.message, type: 'error' });
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleDeletePhoto = async (photoId: string, imageUrl: string) => {
+  const handleDeletePhoto = async (photoId: string) => {
     try {
-      // 1. Delete DB entry
       const { error: dbError } = await supabase
         .from('portfolios')
         .delete()
         .eq('id', photoId);
-      
+
       if (dbError) throw dbError;
 
-      // 2. Update UI
       setPortfolio(portfolio.filter(p => p.id !== photoId));
+      setNotification({ message: "Vision Purged: Content removed from gallery.", type: 'success' });
     } catch (error: any) {
-      alert("Error deleting image: " + error.message);
+      setNotification({ message: "Extraction Error: " + error.message, type: 'error' });
     }
   };
 
@@ -233,20 +229,22 @@ export default function PhotographerDashboard() {
         .from('bookings')
         .update({ status: newStatus })
         .eq('id', bookingId);
-      
+
       if (error) throw error;
 
-      // Update UI state
       setBookings(bookings.map(b => b.id === bookingId ? { ...b, status: newStatus } : b));
-      alert(`Booking ${newStatus} successfully!`);
+      setNotification({ 
+        message: newStatus === 'confirmed' ? "Protocol Confirmed: Session accepted." : "Mission Aborted: Session declined.", 
+        type: 'success' 
+      });
     } catch (error: any) {
-      alert("Error updating booking: " + error.message);
+      setNotification({ message: "Command Error: " + error.message, type: 'error' });
     }
   };
 
   const handleUpdateProfile = async () => {
     try {
-      setIsUploading(true); // Reusing isUploading for profile progress
+      setIsUploading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -262,9 +260,9 @@ export default function PhotographerDashboard() {
         .eq('id', user.id);
 
       if (error) throw error;
-      alert("Profile updated successfully!");
+      setNotification({ message: "Core Profile Synchronized: Intelligence updated.", type: 'success' });
     } catch (error: any) {
-      alert("Error updating profile: " + error.message);
+      setNotification({ message: "Sync Error: " + error.message, type: 'error' });
     } finally {
       setIsUploading(false);
     }
@@ -280,7 +278,6 @@ export default function PhotographerDashboard() {
 
   return (
     <div className="min-h-screen bg-muted/30 pt-20 flex">
-      {/* Dynamic Sidebar */}
       <aside className="w-64 bg-background border-r border-border hidden lg:flex flex-col sticky top-20 h-[calc(100vh-5rem)]">
         <div className="p-6 border-b border-border/50 flex flex-col gap-4">
           {profile?.avatar_url && (
@@ -289,347 +286,251 @@ export default function PhotographerDashboard() {
             </div>
           )}
           <div>
-            <h2 className="font-serif font-black text-xl italic tracking-tight">{profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Studio</h2>
+            <h2 className="font-serif font-black text-xl italic tracking-tight underline decoration-primary decoration-2 underline-offset-4">{profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Studio</h2>
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-1">Management Console</p>
           </div>
         </div>
-        
+
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           <SidebarItem icon={LayoutDashboard} label="Overview" active={activeTab === "overview"} onClick={() => setActiveTab("overview")} />
           <SidebarItem icon={Calendar} label="All Bookings" active={activeTab === "bookings"} onClick={() => setActiveTab("bookings")} badge={bookings.length} />
           <SidebarItem icon={ImageIcon} label="Portfolio & Profile" active={activeTab === "portfolio"} onClick={() => setActiveTab("portfolio")} />
-          <SidebarItem icon={MessageSquare} label="Messages" active={activeTab === "messages"} onClick={() => setActiveTab("messages")} badge={messages.length} />
           <SidebarItem icon={Settings} label="Settings" active={activeTab === "settings"} onClick={() => setActiveTab("settings")} />
         </nav>
 
+        <div className="px-6 py-4 space-y-3 mt-auto border-t border-border/50">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Support & Help</p>
+          <div className="space-y-2">
+            <a href="tel:8309768825" className="flex items-center gap-2 text-[11px] font-bold italic text-foreground hover:text-primary transition-colors">
+              <Phone className="w-3.5 h-3.5 text-primary" /> 8309768825
+            </a>
+            <a href="mailto:bellapukondatejavardhan@gmail.com" className="flex items-center gap-2 text-[10px] font-bold italic text-muted-foreground hover:text-primary transition-colors truncate">
+              <Mail className="w-3.5 h-3.5 text-primary shrink-0" /> bellapukondatejavardhan@gmail.com
+            </a>
+          </div>
+        </div>
+
         <div className="p-4 border-t border-border/50">
-          <Button variant="ghost" onClick={handleSignOut} className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 gap-3 font-semibold">
+          <Button variant="ghost" onClick={handleSignOut} className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 gap-3 font-semibold italic">
             <LogOut className="w-4 h-4" /> Sign Out
           </Button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 px-6 lg:px-12 py-10 overflow-y-auto w-full max-w-7xl mx-auto">
-        
-        {/* ===================== OVERVIEW TAB ===================== */}
-        {activeTab === "overview" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-10 group">
-            <div className="flex flex-col md:flex-row md:items-end justify-between items-center gap-6">
-              <div className="space-y-1 text-center md:text-left">
-                <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold italic tracking-wider uppercase mb-1.5 border border-primary/20 backdrop-blur-sm">
-                  <Star className="w-3.5 h-3.5 fill-current" /> Premium Photographer
-                </motion.div>
-                <div className="flex items-center gap-6 mb-2">
-                  <h1 className="text-4xl md:text-5xl font-extrabold font-serif tracking-tight text-foreground">
-                    {profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Hub <span className="text-primary italic opacity-90 inline-block rotate-[-2deg] transition-transform group-hover:rotate-0 duration-500">.</span>
+        <AnimatePresence mode="wait">
+          {activeTab === "overview" && (
+            <motion.div key="overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-10">
+              <div className="flex flex-col md:flex-row md:items-end justify-between items-center gap-6">
+                <div className="space-y-1 text-center md:text-left">
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold italic tracking-wider uppercase mb-1.5 border border-primary/20 backdrop-blur-sm">
+                    <Star className="w-3.5 h-3.5 fill-current" /> Premium Photographer
+                  </motion.div>
+                  <h1 className="text-4xl md:text-5xl font-extrabold font-serif tracking-tight text-foreground italic">
+                    {profile?.full_name?.split(' ')[0] || 'Pro'}&apos;s Hub <span className="text-primary">.</span>
                   </h1>
+                  <p className="text-muted-foreground max-w-md">Welcome back, {profile?.full_name}. Here is your vision command center.</p>
                 </div>
-                <p className="text-muted-foreground max-w-md">Welcome back, {profile?.full_name}. Here is your vision command center.</p>
-              </div>
-              <div className="flex gap-4 w-full md:w-auto">
-                <Button onClick={() => setActiveTab("portfolio")} size="lg" className="flex-1 md:flex-none gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-xl shadow-primary/20 transition-all px-8 border-2">
-                  <ImageIcon className="w-4.5 h-4.5" /> Upload Work
+                <Button onClick={() => setActiveTab("portfolio")} size="lg" className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black italic shadow-xl shadow-primary/20 transition-all px-8">
+                  <Plus className="w-5 h-5" /> Upload Work
                 </Button>
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              {/* Recent Bookings */}
-              <div className="lg:col-span-8 space-y-6">
-                <Card className="border-none shadow-2xl shadow-black/5 bg-background overflow-hidden ring-1 ring-border">
-                  <CardHeader className="flex flex-row items-center justify-between border-b border-border/50 px-8 py-7 bg-muted/[0.15]">
-                    <div>
-                      <CardTitle className="text-2xl font-serif font-black italic tracking-tight">Recent Sessions</CardTitle>
-                      <CardDescription className="font-medium mt-0.5">Your most recent customer requests</CardDescription>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-border/30">
-                      {bookings.length === 0 ? (
-                        <div className="p-12 text-center text-muted-foreground font-medium italic">No active bookings yet. Time to promote your portfolio!</div>
-                      ) : bookings.slice(0, 3).map((booking) => (
-                        <div key={booking.id} className="p-8 flex flex-col sm:flex-row items-center sm:justify-between hover:bg-muted/30 transition-all cursor-pointer group/row">
-                          <div className="flex items-center gap-6 w-full sm:w-auto mb-4 sm:mb-0">
-                            <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center border border-border group-hover/row:border-primary/30 group-hover/row:bg-primary/5 transition-all rotate-[-3deg] group-hover/row:rotate-0">
-                              <ImageIcon className="w-7 h-7 text-muted-foreground group-hover/row:text-primary transition-colors" />
-                            </div>
-                            <div>
-                              <h4 className="text-lg font-black italic tracking-tight text-foreground">{booking.client?.full_name || 'Client'}</h4>
-                              <p className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-                                 <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> {booking.type}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-between w-full sm:w-auto gap-8 sm:gap-12">
-                            <div className="text-left sm:text-right">
-                              <p className="font-black text-foreground italic">{booking.date}</p>
-                              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{booking.time}</p>
-                              <div className="mt-2 text-[10px] font-black uppercase tracking-widest text-primary italic">{booking.status}</div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {booking.status === 'pending' ? (
-                                <>
-                                  <Button 
-                                    size="sm" 
-                                    className="bg-emerald-500 hover:bg-emerald-600 font-bold italic h-9 px-4"
-                                    onClick={() => handleBookingStatus(booking.id, 'confirmed')}
-                                  >
-                                    Accept
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive" 
-                                    className="font-bold italic h-9 px-4"
-                                    onClick={() => handleBookingStatus(booking.id, 'rejected')}
-                                  >
-                                    Reject
-                                  </Button>
-                                </>
-                              ) : (
-                                <div className="h-10 w-[2px] bg-border/40 hidden sm:block" />
-                              )}
-                              <p className="text-xl font-black italic text-foreground tracking-tighter ml-2">{booking.amount}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Pending Requests</p><h3 className="text-3xl font-black italic">{bookings.filter(b => b.status === 'pending').length}</h3></div>
+                    <Calendar className="w-8 h-8 text-primary opacity-50" />
+                  </CardContent>
+                </Card>
+                <Card className="bg-emerald-500/5 border-emerald-500/20">
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div><p className="text-xs font-bold uppercase tracking-widest text-emerald-500">Confirmed Sessions</p><h3 className="text-3xl font-black italic">{bookings.filter(b => b.status === 'confirmed').length}</h3></div>
+                    <CheckCircle className="w-8 h-8 text-emerald-500 opacity-50" />
+                  </CardContent>
+                </Card>
+                <Card className="bg-purple-500/5 border-purple-500/20">
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div><p className="text-xs font-bold uppercase tracking-widest text-purple-500">Gallery Items</p><h3 className="text-3xl font-black italic">{portfolio.length}</h3></div>
+                    <ImageIcon className="w-8 h-8 text-purple-500 opacity-50" />
                   </CardContent>
                 </Card>
               </div>
-              
-              {/* Inbox Summary */}
-              <div className="lg:col-span-4">
-                 <Card className="border-none shadow-2xl shadow-black/5 bg-background ring-1 ring-border group/tools">
-                  <CardHeader className="border-b border-border/50 px-7 py-6">
-                    <CardTitle className="text-xl font-serif font-black italic">Inbox</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    <div className="divide-y divide-border/30">
-                      {messages.length === 0 ? (
-                        <div className="p-8 text-center text-xs text-muted-foreground italic">Your inbox is quiet.</div>
-                      ) : messages.map((msg) => (
-                        <div key={msg.id} className="p-6 flex items-start gap-4 hover:bg-muted/30 transition-all cursor-pointer relative overflow-hidden group/msg">
-                          <div className="w-11 h-11 min-w-[44px] bg-muted rounded-xl flex items-center justify-center font-black italic">
-                            {msg.sender?.full_name?.charAt(0) || 'U'}
+
+              <div className="space-y-6">
+                <h2 className="text-2xl font-black italic tracking-tight font-serif uppercase underline decoration-primary decoration-4 underline-offset-8">Recent Activity</h2>
+                <Card className="border-none shadow-2xl ring-1 ring-border overflow-hidden">
+                  <div className="divide-y divide-border/30">
+                    {bookings.length === 0 ? (
+                      <div className="p-12 text-center text-muted-foreground font-medium italic">No active bookings yet. Time to promote your portfolio!</div>
+                    ) : bookings.slice(0, 5).map((booking) => (
+                      <div key={booking.id} className="p-8 flex flex-col sm:flex-row items-center sm:justify-between hover:bg-muted/30 transition-all group">
+                        <div className="flex items-center gap-6 mb-4 sm:mb-0">
+                          <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center border-2 rotate-[-4deg] group-hover:rotate-0 transition-all", booking.status === 'confirmed' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-primary/10 border-primary/20 text-primary")}>
+                             {booking.client?.avatar_url ? <img src={booking.client.avatar_url} className="w-full h-full object-cover rounded-2xl" /> : <User className="w-7 h-7" />}
                           </div>
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <p className="text-sm font-black italic text-foreground truncate">{msg.sender?.full_name || 'Unknown'}</p>
-                            <p className="text-xs line-clamp-1 italic text-muted-foreground font-medium">"{msg.text}"</p>
+                          <div>
+                            <h4 className="text-lg font-black italic tracking-tight text-foreground">{booking.client?.full_name || 'Client'}</h4>
+                            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">{booking.type || 'Standard Session'}</p>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
+                        <div className="flex items-center gap-8">
+                          <div className="text-right">
+                            <p className="font-black text-foreground italic">{booking.date}</p>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest italic">{booking.status === 'pending' ? 'Awaiting Protocol' : 'Elite Access Confirmed'}</p>
+                          </div>
+                          <div className="flex gap-2">
+                             {booking.status === 'pending' ? (
+                               <>
+                                 <Button size="sm" onClick={() => handleBookingStatus(booking.id, 'confirmed')} className="bg-emerald-500 hover:bg-emerald-600 font-black italic h-10 px-6">Accept</Button>
+                                 <Button size="sm" variant="destructive" onClick={() => handleBookingStatus(booking.id, 'rejected')} className="font-black italic h-10 px-6">Decline</Button>
+                               </>
+                             ) : (
+                               <div className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest italic border", booking.status === 'confirmed' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-rose-500/10 text-rose-500 border-rose-500/20")}>
+                                 {booking.status === 'confirmed' ? 'Protocol Executed' : 'Session Terminated'}
+                               </div>
+                             )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </Card>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
 
-        {/* ===================== ALL BOOKINGS TAB ===================== */}
-        {activeTab === "bookings" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <h2 className="text-3xl font-extrabold font-serif italic mb-6">Customer Bookings</h2>
-            <Card className="border-none shadow-xl overflow-hidden ring-1 ring-border">
-              <CardContent className="p-0">
-                 <div className="divide-y divide-border/30">
-                      {bookings.length === 0 ? (
-                        <div className="p-16 text-center text-muted-foreground font-medium italic">You have no booking history.</div>
-                      ) : bookings.map((booking) => (
-                        <div key={booking.id} className="p-8 flex items-center justify-between hover:bg-muted/30 transition-all">
-                          <div className="flex items-center gap-6">
-                            <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 text-primary">
-                              <Calendar className="w-6 h-6" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h4 className="text-xl font-bold">{booking.client?.full_name || 'Client'}</h4>
-                                <span className={cn(
-                                  "px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest italic",
-                                  booking.status === 'confirmed' ? "bg-emerald-500/10 text-emerald-500" :
-                                  booking.status === 'rejected' ? "bg-destructive/10 text-destructive" :
-                                  "bg-primary/10 text-primary"
-                                )}>
-                                  {booking.status}
-                                </span>
-                              </div>
-                              <p className="text-sm font-semibold text-muted-foreground">{booking.type}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-3">
-                            <div className="text-right">
-                              <p className="font-bold text-lg">{booking.date}</p>
-                              <p className="text-sm font-bold text-muted-foreground uppercase">{booking.time} • <span className="text-foreground">{booking.amount}</span></p>
-                            </div>
-                            {booking.status === 'pending' && (
-                              <div className="flex gap-2">
-                                 <Button 
-                                    size="sm" 
-                                    className="bg-emerald-500 hover:bg-emerald-600 font-bold italic h-8 px-3 text-[10px]"
-                                    onClick={() => handleBookingStatus(booking.id, 'confirmed')}
-                                  >
-                                    Accept
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive" 
-                                    className="font-bold italic h-8 px-3 text-[10px]"
-                                    onClick={() => handleBookingStatus(booking.id, 'rejected')}
-                                  >
-                                    Reject
-                                  </Button>
-                              </div>
-                            )}
-                          </div>
+          {activeTab === "bookings" && (
+            <motion.div key="bookings" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+              <h1 className="text-4xl font-black italic font-serif">Customer Sessions</h1>
+              <Card className="border-none shadow-2xl ring-1 ring-border overflow-hidden">
+                <div className="divide-y divide-border/30">
+                  {bookings.map((booking) => (
+                    <div key={booking.id} className="p-8 flex items-center justify-between hover:bg-muted/30 transition-all">
+                      <div className="flex items-center gap-6">
+                        <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 text-primary italic font-black">
+                           <Calendar className="w-6 h-6" />
                         </div>
-                      ))}
+                        <div>
+                          <h4 className="text-xl font-black italic">{booking.client?.full_name || 'Client'}</h4>
+                          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{booking.date} @ {booking.time}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-6">
+                         <div className="text-right">
+                            <p className="text-xl font-black italic text-primary">{booking.amount}</p>
+                            <div className={cn("inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mt-1 border", booking.status === 'confirmed' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-primary/10 text-primary border-primary/20")}>
+                              {booking.status}
+                            </div>
+                         </div>
+                         {booking.status === 'pending' && (
+                           <div className="flex gap-2">
+                             <Button size="sm" onClick={() => handleBookingStatus(booking.id, 'confirmed')} className="bg-emerald-500 h-10 px-6 font-black italic uppercase text-[10px] tracking-widest">Accept</Button>
+                             <Button size="sm" variant="destructive" onClick={() => handleBookingStatus(booking.id, 'rejected')} className="h-10 px-6 font-black italic uppercase text-[10px] tracking-widest">Decline</Button>
+                           </div>
+                         )}
+                      </div>
                     </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        )}
+                  ))}
+                </div>
+              </Card>
+            </motion.div>
+          )}
 
-        {/* ===================== PORTFOLIO & PROFILE TAB ===================== */}
-        {activeTab === "portfolio" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
-            <div className="flex justify-between items-end">
-              <h2 className="text-3xl font-extrabold font-serif italic">Portfolio Management</h2>
-              <Button 
-                onClick={handleUpdateProfile} 
-                disabled={isUploading}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-xl shadow-primary/20 gap-2"
-              >
-                 {isUploading ? "Saving..." : "Save Changes"}
-              </Button>
-            </div>
+          {activeTab === "portfolio" && (
+            <motion.div key="portfolio" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-10">
+              <div className="flex justify-between items-end">
+                <div className="space-y-1">
+                  <h2 className="text-4xl font-black italic font-serif leading-none">Vision Command</h2>
+                  <p className="text-muted-foreground italic font-medium">Curate your elite gallery and profile identity.</p>
+                </div>
+                <Button onClick={handleUpdateProfile} disabled={isUploading} className="bg-primary hover:bg-primary/90 text-primary-foreground font-black italic h-14 px-10 shadow-xl shadow-primary/20">
+                  {isUploading ? "Syncing..." : "Publish Vision"}
+                </Button>
+              </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Profile Details */}
-              <div className="lg:col-span-1 space-y-6">
-                <Card className="border-none shadow-xl ring-1 ring-border">
-                  <CardHeader>
-                    <CardTitle className="italic font-serif">Public Profile</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex flex-col items-center gap-4 mb-4">
-                      <div className="relative group">
-                        <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-primary/20 shadow-xl bg-muted">
-                          {profile?.avatar_url ? (
-                            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-muted-foreground bg-muted-foreground/10">
-                              <User className="w-12 h-12" />
-                            </div>
-                          )}
-                        </div>
-                        <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-full cursor-pointer">
-                          <Upload className="text-white w-6 h-6" />
-                          <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div className="lg:col-span-4 space-y-6">
+                  <Card className="border-none shadow-2xl ring-1 ring-border p-8 bg-background/50 backdrop-blur-xl">
+                    <div className="flex flex-col items-center gap-6 mb-8">
+                       <div className="relative group">
+                         <div className="w-40 h-40 rounded-[2.5rem] overflow-hidden border-4 border-primary/10 shadow-2xl bg-muted rotate-3 group-hover:rotate-0 transition-transform duration-500">
+                           {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <User className="w-16 h-16 text-muted-foreground m-auto h-full" />}
+                         </div>
+                         <label className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem] cursor-pointer">
+                           <Upload className="text-white w-8 h-8" />
+                           <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+                         </label>
+                       </div>
+                       <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground italic">Redesign Persona Portrait</p>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-widest opacity-50 italic pl-1">Professional Moniker</Label>
+                        <Input className="h-12 rounded-2xl border-2 font-bold italic" value={profile?.full_name || ""} onChange={(e) => setProfile({ ...profile, full_name: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-widest opacity-50 italic pl-1">Artistic Specialty</Label>
+                        <Input className="h-12 rounded-2xl border-2 font-bold italic" value={profile?.specialty || ""} onChange={(e) => setProfile({ ...profile, specialty: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-widest opacity-50 italic pl-1">HQ Location</Label>
+                        <Input className="h-12 rounded-2xl border-2 font-bold italic" value={profile?.location || ""} onChange={(e) => setProfile({ ...profile, location: e.target.value })} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-[10px] uppercase font-black tracking-widest opacity-50 italic pl-1">Session Investment</Label>
+                        <Input className="h-12 rounded-2xl border-2 font-bold italic" value={profile?.rate || ""} onChange={(e) => setProfile({ ...profile, rate: e.target.value })} />
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
+                <div className="lg:col-span-8 space-y-8">
+                   <Card className="border-none shadow-2xl ring-1 ring-border p-8">
+                      <div className="flex justify-between items-center mb-8">
+                        <h3 className="text-2xl font-black italic tracking-tighter uppercase underline decoration-primary decoration-4 underline-offset-8">Masterpieces</h3>
+                        <label className={cn("px-6 py-3 rounded-xl bg-primary text-primary-foreground font-black italic cursor-pointer shadow-lg shadow-primary/20", isUploading && "opacity-50")}>
+                          {isUploading ? "Uploading..." : "Add Masterpiece"}
+                          <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={isUploading} />
                         </label>
                       </div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Click to update portrait</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Display Name</Label>
-                      <Input 
-                        value={profile?.full_name || ""} 
-                        onChange={(e) => setProfile({...profile, full_name: e.target.value})} 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Specialty (e.g. Wedding, Portrait)</Label>
-                      <Input 
-                        value={profile?.specialty || ""} 
-                        onChange={(e) => setProfile({...profile, specialty: e.target.value})} 
-                        placeholder="Wedding & Commercial" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Operational Location (City, State)</Label>
-                      <Input 
-                        value={profile?.location || ""} 
-                        onChange={(e) => setProfile({...profile, location: e.target.value})} 
-                        placeholder="Los Angeles, CA" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Hourly Rate / Minimum</Label>
-                      <Input 
-                        value={profile?.rate || ""} 
-                        onChange={(e) => setProfile({...profile, rate: e.target.value})} 
-                        placeholder="$250 / session" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Bio</Label>
-                      <textarea 
-                        className="w-full h-32 rounded-xl border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" 
-                        value={profile?.bio || ""} 
-                        onChange={(e) => setProfile({...profile, bio: e.target.value})} 
-                        placeholder="Capturing raw moments and natural lighting." 
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
 
-              {/* Photos Gallery */}
-              <div className="lg:col-span-2 space-y-6">
-                 <Card className="border-none shadow-xl ring-1 ring-border">
-                  <CardContent className="p-8">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-serif font-bold italic">Gallery Images</h3>
-                      <Button variant="outline" size="sm" className="gap-2 font-bold"><Plus className="w-4 h-4" /> Add Photo</Button>
-                    </div>
-
-                    {/* Real Portfolio Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                         {portfolio.map((photo) => (
-                           <div key={photo.id} className="aspect-square bg-muted rounded-2xl relative group overflow-hidden border border-border shadow-sm">
-                             <img src={photo.image_url} alt={photo.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Button 
-                                  variant="destructive" 
-                                  size="sm" 
-                                  className="font-bold shrink-0 shadow-lg"
-                                  onClick={() => handleDeletePhoto(photo.id, photo.image_url)}
-                                >
-                                  Remove
-                                </Button>
-                             </div>
-                           </div>
+                          <div key={photo.id} className="aspect-square rounded-3xl relative group overflow-hidden border-2 border-border shadow-md">
+                            <img src={photo.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center p-4">
+                               <Button variant="destructive" size="sm" onClick={() => handleDeletePhoto(photo.id)} className="font-black italic uppercase tracking-tighter h-10 px-6">Delete</Button>
+                            </div>
+                          </div>
                         ))}
-                        
-                        <label className={cn(
-                          "aspect-square bg-muted/30 border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/50 hover:border-primary/50 transition-colors text-muted-foreground hover:text-primary",
-                          isUploading && "opacity-50 pointer-events-none"
-                        )}>
-                          {isUploading ? (
-                            <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }} className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                          ) : (
-                            <>
-                              <Plus className="w-8 h-8" />
-                              <span className="text-xs font-bold uppercase tracking-widest">Add Photo</span>
-                            </>
-                          )}
-                          <input 
-                            type="file" 
-                            accept="image/*" 
-                            className="hidden" 
-                            onChange={handleFileUpload}
-                            disabled={isUploading}
-                          />
-                        </label>
-                    </div>
-                  </CardContent>
-                 </Card>
+                      </div>
+                   </Card>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
+        {/* Cinematic TOP Notification System */}
+        <AnimatePresence>
+          {notification && (
+            <motion.div initial={{ opacity: 0, y: -100, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: -20, x: "-50%", scale: 0.95 }} className="fixed top-10 left-1/2 -translate-x-1/2 z-[200] w-auto min-w-[340px] max-w-lg px-6">
+              <div className={cn("relative overflow-hidden p-6 rounded-[2rem] border shadow-2xl backdrop-blur-3xl flex items-center gap-6", notification.type === 'success' ? "bg-emerald-500/5 border-emerald-500/20 shadow-emerald-500/10" : "bg-rose-500/5 border-rose-500/20 shadow-rose-500/10")}>
+                <div className={cn("absolute top-0 left-0 right-0 h-1", notification.type === 'success' ? "bg-emerald-500" : "bg-rose-500")} />
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0", notification.type === 'success' ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500")}>
+                  {notification.type === 'success' ? <CheckCircle className="w-6 h-6 stroke-[2.5]" /> : <XCircle className="w-6 h-6 stroke-[2.5]" />}
+                </div>
+                <div className="space-y-1">
+                   <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 italic">System Dispatch Signal</p>
+                   <h4 className="text-base font-black italic leading-tight tracking-tight text-foreground">{notification.message}</h4>
+                </div>
+                <button onClick={() => setNotification(null)} className="ml-4 p-2 rounded-xl hover:bg-muted/50 transition-colors opacity-30 hover:opacity-100"><X className="w-4 h-4" /></button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );

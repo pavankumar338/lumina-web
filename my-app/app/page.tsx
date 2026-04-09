@@ -15,7 +15,7 @@ export default function Home() {
       <Categories />
       <FeaturedPhotographers />
       
-      {/* Why Choose Lumina Section */}
+      {/* Why Choose Menorify Section */}
       <section className="py-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
@@ -29,7 +29,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-10 left-10 p-8 glass-morphism rounded-3xl max-w-sm">
                 <p className="text-white text-xl font-medium tracking-tight leading-relaxed italic">
-                  &quot;The quality of professionals on Lumina is simply unmatched. It&apos;s my go-to platform for every brand shoot.&quot;
+                  &quot;The quality of professionals on Menorify is simply unmatched. It&apos;s my go-to platform for every brand shoot.&quot;
                 </p>
                 <div className="mt-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-primary" />
@@ -43,7 +43,7 @@ export default function Home() {
 
             <div>
               <h2 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl leading-tight text-serif">
-                Why <span className="italic text-primary">Lumina</span> is the preferred choice for elite clients.
+                Why <span className="italic text-primary">Menorify</span> is the preferred choice for elite clients.
               </h2>
               <div className="mt-12 space-y-10">
                 <FeatureItem 
@@ -84,7 +84,7 @@ export default function Home() {
                 your <span className="text-serif italic">perfect</span> artist?
               </h2>
               <p className="mt-8 text-xl text-primary-foreground opacity-90 max-w-xl leading-relaxed">
-                Join thousands of customers who trust Lumina to find world-class
+                Join thousands of customers who trust Menorify to find world-class
                 photographers for their most important life events.
               </p>
               <div className="mt-12 flex flex-col sm:flex-row gap-6">
