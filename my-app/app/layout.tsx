@@ -13,7 +13,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "Menorify | Professional Photographer Marketplace",
+  title: "Memorify | Professional Photographer Marketplace",
   description: "Connect with world-class photographers for your most precious moments.",
 };
 

@@ -14,13 +14,13 @@ export default function Home() {
       <Hero />
       <Categories />
       <FeaturedPhotographers />
-      
-      {/* Why Choose Menorify Section */}
+
+
       <section className="py-24 bg-zinc-50 dark:bg-zinc-950">
         <div className="container mx-auto px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
             <div className="relative h-[600px] rounded-[3rem] overflow-hidden shadow-2xl">
-              <Image 
+              <Image
                 src="https://images.unsplash.com/photo-1554048612-b6a482bc67e5?q=80&w=3540&auto=format&fit=crop"
                 alt="Photographer at work"
                 fill
@@ -29,7 +29,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
               <div className="absolute bottom-10 left-10 p-8 glass-morphism rounded-3xl max-w-sm">
                 <p className="text-white text-xl font-medium tracking-tight leading-relaxed italic">
-                  &quot;The quality of professionals on Menorify is simply unmatched. It&apos;s my go-to platform for every brand shoot.&quot;
+                  &quot;The quality of professionals on Memorify is simply unmatched. It&apos;s my go-to platform for every brand shoot.&quot;
                 </p>
                 <div className="mt-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-primary" />
@@ -43,20 +43,20 @@ export default function Home() {
 
             <div>
               <h2 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl leading-tight text-serif">
-                Why <span className="italic text-primary">Menorify</span> is the preferred choice for elite clients.
+                Why <span className="italic text-primary">Memorify</span> is the preferred choice for elite clients.
               </h2>
               <div className="mt-12 space-y-10">
-                <FeatureItem 
+                <FeatureItem
                   icon={ShieldCheck}
                   title="Verified Professionals"
                   description="Every photographer undergoes a rigorous background check and portfolio review process before joining our network."
                 />
-                <FeatureItem 
+                <FeatureItem
                   icon={HeartPulse}
                   title="Seamless Experience"
                   description="From instant booking to secure payments and real-time chat, we handle the logistics so you can focus on the moment."
                 />
-                <FeatureItem 
+                <FeatureItem
                   icon={Star}
                   title="Unmatched Quality"
                   description="Access a curated selection of award-winning artists who specialize in capturing high-end, cinematic visuals."
@@ -84,7 +84,7 @@ export default function Home() {
                 your <span className="text-serif italic">perfect</span> artist?
               </h2>
               <p className="mt-8 text-xl text-primary-foreground opacity-90 max-w-xl leading-relaxed">
-                Join thousands of customers who trust Menorify to find world-class
+                Join thousands of customers who trust Memorify to find world-class
                 photographers for their most important life events.
               </p>
               <div className="mt-12 flex flex-col sm:flex-row gap-6">

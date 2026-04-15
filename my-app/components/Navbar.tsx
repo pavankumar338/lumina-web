@@ -36,7 +36,7 @@ export function Navbar() {
             <Camera className="w-6 h-6 text-primary-foreground" />
           </div>
           <span className="text-2xl font-bold tracking-tight text-foreground">
-            Menorify
+            Memorify
           </span>
         </Link>
 
@@ -60,8 +60,8 @@ export function Navbar() {
         <div className="hidden md:flex items-center gap-4">
           {isDashboard ? (
             <div className="flex items-center gap-4">
-              <Link 
-                href="/" 
+              <Link
+                href="/"
                 className="text-sm font-semibold italic border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition-all"
               >
                 Sign Out
@@ -72,24 +72,24 @@ export function Navbar() {
             </div>
           ) : (
             <>
-              <Link 
-                href="/login" 
+              <Link
+                href="/login"
                 className="text-sm font-semibold italic border border-border px-6 py-2.5 rounded-xl hover:bg-muted transition-all active:scale-95"
               >
                 Sign In
               </Link>
-              <Link 
-                href="/signup" 
+              <Link
+                href="/signup"
                 className="text-sm font-black italic px-7 py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 transition-opacity shadow-lg shadow-primary/20 tracking-widest uppercase active:scale-95"
               >
-                Join Menorify
+                Join Memorify
               </Link>
             </>
           )}
         </div>
 
         {/* Mobile Menu Toggle */}
-        <button 
+        <button
           className="md:hidden p-2 text-foreground"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
@@ -105,11 +105,11 @@ export function Navbar() {
           <Link href="/pricing" className="text-lg font-medium">Pricing</Link>
           <hr className="border-border/50" />
           <Link href="/login" className="text-xl font-black italic tracking-tight">Sign In</Link>
-          <Link 
-            href="/signup" 
+          <Link
+            href="/signup"
             className="text-xl font-black italic px-6 py-4 bg-primary text-primary-foreground rounded-2xl text-center shadow-xl shadow-primary/10 tracking-widest uppercase"
           >
-            Join Menorify
+            Join Memorify
           </Link>
         </div>
       )}
